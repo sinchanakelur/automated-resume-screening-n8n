@@ -7,17 +7,16 @@ An AI-powered automated resume screening workflow built using **n8n**, **Google 
 - n8n
 - JavaScript
 - Google Forms
-- Google Sheets 
-- Google Drive 
-- Gmail
+- Google Sheets API
+- Google Drive API
+- Gmail API
 - Google Gemini (LLM)
 
 ---
 
 ## Workflow Architecture
 
-<img width="134" height="419" alt="image" src="https://github.com/user-attachments/assets/ecda4ef3-6ebe-4b71-9b05-ee15a5472921" />
-
+![Workflow](screenshots/workflow-architecture.png)
 
 ---
 
