@@ -1,0 +1,499 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "documentId": {
+          "__rl": true,
+          "value": "14aOwgk8M4Y6Wb_4LdsDrx74vBfcL2fk_lsceqpCyLxM",
+          "mode": "list",
+          "cachedResultName": "SDE-1 Candidate Tracker",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/14aOwgk8M4Y6Wb_4LdsDrx74vBfcL2fk_lsceqpCyLxM/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1366710605,
+          "mode": "list",
+          "cachedResultName": "Form Responses 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/14aOwgk8M4Y6Wb_4LdsDrx74vBfcL2fk_lsceqpCyLxM/edit#gid=1366710605"
+        },
+        "event": "rowAdded",
+        "options": {}
+      },
+      "id": "9fad9818-afca-4b43-8b70-8b4c46ffd946",
+      "name": "Google Sheets Trigger",
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "googleSheetsTriggerOAuth2Api": {
+          "id": "hH0sp1C3rO2g5XAt",
+          "name": "Google Sheets Trigger account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst output = [];\n\nfor (let i = 0; i < items.length; i++) {\n  // Normalize keys: header cells in the sheet have padding spaces\n  // (e.g. \"  Resume  \"), so build a trimmed-key lookup.\n  const row = {};\n  for (const key of Object.keys(items[i].json)) {\n    row[key.trim()] = items[i].json[key];\n  }\n\n  const resume = String(row['Resume'] || '').trim();\n\n  let fileId = null;\n\n  let match = resume.match(/\\/d\\/([a-zA-Z0-9_-]+)/);\n  if (match) fileId = match[1];\n\n  if (!fileId) {\n    match = resume.match(/[?&]id=([a-zA-Z0-9_-]+)/);\n    if (match) fileId = match[1];\n  }\n\n  if (!fileId && /^[a-zA-Z0-9_-]{20,}$/.test(resume)) {\n    fileId = resume;\n  }\n\n  output.push({\n    json: {\n      name: row['Name'],\n      email: row['Email'],\n      linkedin: row['LinkedIn URL'],\n      techStack: row['Tech Stack'],\n      resume: resume,\n      fileId: fileId,\n      timestamp: row['Timestamp'],\n      rowNumber: row.row_number\n    },\n    pairedItem: { item: i }\n  });\n}\n\nreturn output;"
+      },
+      "id": "2c43bc28-f9f4-44da-a085-cb3bd26bd84b",
+      "name": "Code in JavaScript",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $('Code in JavaScript').item.json.fileId }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "31858375-c98e-43d9-a9c1-a4b135d1ee06",
+      "name": "Download file",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        448,
+        0
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "BhimUg6Okss4o8RR",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "id": "14b3b075-aec6-42ac-b2f7-f59d66fa88b6",
+      "name": "Extract from File",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are an expert technical recruiter screening candidates for an SDE-1 Backend, Frontend, or Fullstack role.\n\nAnalyze the candidate information and resume text below.\n\nCANDIDATE INFORMATION:\n\nThe resume text below contains the candidate's name, contact details,\nLinkedIn, skills, education, projects, and experience.\n\nRESUME TEXT:\n{{ $json.text }}\n\nEvaluate the candidate on:\n\n1. Classify the role as exactly one:\nBackend\nFrontend\nFullstack\n\n2. Give scores from 0 to 10:\n- Technical Skill Match\n- Experience Relevance\n- Communication Quality\n- Education Quality\n\n3. Identify education category:\n- State Board\n- CBSE\n- ICSE\n- IB\n- Others\n- Not Specified\n\nDo not guess missing information.\n\n4. Extract:\n- Technical skills\n- Highest degree\n- College\n- Strengths\n- Gaps\n- Short summary\n\nDo not invent information.\n\nReturn ONLY valid JSON in exactly this format:\n\n{\n  \"name\": \"\",\n  \"role_category\": \"\",\n  \"technical_skills\": [],\n  \"technical_skill_match\": 0,\n  \"experience_relevance\": 0,\n  \"communication_quality\": 0,\n  \"education_quality\": 0,\n  \"education_category\": \"\",\n  \"highest_degree\": \"\",\n  \"college\": \"\",\n  \"strengths\": [],\n  \"gaps\": [],\n  \"summary\": \"\"\n}",
+        "batching": {}
+      },
+      "id": "620671a9-fffa-4b42-b932-485fbf64d89c",
+      "name": "Basic LLM Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        784,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "622e0909-7e93-4fe0-97e0-b10fa75d43ee",
+      "name": "Google Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        208
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": null,
+          "name": "",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst sheetItems = $('Code in JavaScript').all();\nconst output = [];\n\nfor (let i = 0; i < items.length; i++) {\n  const input = items[i].json;\n\n  // Get the AI response\n  let aiText = input.text || input.output || input.response || '';\n\n  // Remove markdown code fences if Gemini adds them\n  aiText = aiText\n    .replace(/```json/g, '')\n    .replace(/```/g, '')\n    .trim();\n\n  const evaluation = JSON.parse(aiText);\n\n  // Recommendation logic from the assignment\n  const recommendation =\n    evaluation.technical_skill_match >= 7 &&\n    evaluation.experience_relevance >= 6\n      ? 'Recommended'\n      : 'Not Recommended';\n\n  // Identity comes from the sheet row (paired by index), not the resume text,\n  // so the email/sheet always match the actual applicant.\n  const sheetRow = (sheetItems[i] && sheetItems[i].json) || {};\n\n  output.push({\n    json: {\n      name: sheetRow.name || evaluation.name,\n      email: sheetRow.email || '',\n      timestamp: sheetRow.timestamp || '',\n      role_category: evaluation.role_category,\n      technical_skills: (evaluation.technical_skills || []).join(', '),\n\n      technical_skill_match: evaluation.technical_skill_match,\n      experience_relevance: evaluation.experience_relevance,\n      communication_quality: evaluation.communication_quality,\n      education_quality: evaluation.education_quality,\n\n      education_category: evaluation.education_category,\n      highest_degree: evaluation.highest_degree,\n      college: evaluation.college,\n\n      final_score:\n        (\n          evaluation.technical_skill_match * 0.4 +\n          evaluation.experience_relevance * 0.3 +\n          evaluation.communication_quality * 0.2 +\n          evaluation.education_quality * 0.1\n        ).toFixed(2),\n\n      recommendation: recommendation,\n\n      summary: evaluation.summary,\n      strengths: (evaluation.strengths || []).join(', '),\n      gaps: (evaluation.gaps || []).join(', ')\n    },\n    pairedItem: { item: i }\n  });\n}\n\nreturn output;"
+      },
+      "id": "fd93a713-2b1e-4ad4-be9c-51a276fafbc5",
+      "name": "Code in JavaScript1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1152,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "14aOwgk8M4Y6Wb_4LdsDrx74vBfcL2fk_lsceqpCyLxM",
+          "mode": "list",
+          "cachedResultName": "SDE-1 Candidate Tracker",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/14aOwgk8M4Y6Wb_4LdsDrx74vBfcL2fk_lsceqpCyLxM/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1366710605,
+          "mode": "list",
+          "cachedResultName": "Form Responses 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/14aOwgk8M4Y6Wb_4LdsDrx74vBfcL2fk_lsceqpCyLxM/edit#gid=1366710605"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "  Name  ": "={{ $json.name }}",
+            "Role Category": "={{ $json.role_category }}",
+            "Tech Score": "={{ $json.technical_skill_match }}",
+            "Experience Score": "={{ $json.experience_relevance }}",
+            "Communication Score": "={{ $json.communication_quality }}",
+            "Education Score": "={{ $json.education_quality }}",
+            "Education Category": "={{ $json.education_category }}",
+            "Final Score": "={{ $json.final_score }}",
+            "Recommendation": "={{ $json.recommendation }}",
+            "Summary": "={{ $json.summary }}",
+            "Strengths": "={{ $json.strengths }}",
+            "Gaps": "={{ $json.gaps }}",
+            "Timestamp": "={{ $json.timestamp }}"
+          },
+          "matchingColumns": [
+            "Timestamp"
+          ],
+          "schema": [
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "  Name  ",
+              "displayName": "  Name  ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "  Email  ",
+              "displayName": "  Email  ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "LinkedIn URL",
+              "displayName": "LinkedIn URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "  Tech Stack  ",
+              "displayName": "  Tech Stack  ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "  Resume  ",
+              "displayName": "  Resume  ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Role Category",
+              "displayName": "Role Category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Tech Score",
+              "displayName": "Tech Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Experience Score",
+              "displayName": "Experience Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Communication Score",
+              "displayName": "Communication Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Education Score",
+              "displayName": "Education Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Education Category",
+              "displayName": "Education Category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Final Score",
+              "displayName": "Final Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Recommendation",
+              "displayName": "Recommendation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Summary",
+              "displayName": "Summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Strengths",
+              "displayName": "Strengths",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Gaps",
+              "displayName": "Gaps",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "165baef5-bc22-4c68-8c70-2cdb813e8069",
+      "name": "Update row in sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1376,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "2p4aXUPAaWuGhNNZ",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "sinchanak.ai23@bmsce.ac.in",
+        "subject": "=SDE-1 Candidate Evaluation - {{ $('Code in JavaScript1').item.json.name }}",
+        "message": "=NEW SDE-1 CANDIDATE EVALUATION\n\nName: {{ $('Code in JavaScript1').item.json.name }}\n\nRole: {{ $('Code in JavaScript1').item.json.role_category }}\n\nTechnical Skill Score: {{ $('Code in JavaScript1').item.json.technical_skill_match }}/10\nExperience Relevance: {{ $('Code in JavaScript1').item.json.experience_relevance }}/10\nCommunication Quality: {{ $('Code in JavaScript1').item.json.communication_quality }}/10\nEducation Quality: {{ $('Code in JavaScript1').item.json.education_quality }}/10\n\nEducation Category: {{ $('Code in JavaScript1').item.json.education_category }}\n\nFinal Score: {{ $('Code in JavaScript1').item.json.final_score }}\n\nRecommendation: {{ $('Code in JavaScript1').item.json.recommendation }}\n\nSummary:\n{{ $('Code in JavaScript1').item.json.summary }}\n\nStrengths:\n{{ $('Code in JavaScript1').item.json.strengths }}\n\nGaps:\n{{ $('Code in JavaScript1').item.json.gaps }}",
+        "options": {}
+      },
+      "id": "613be314-e0a2-4d41-ac8f-872d3d0888ad",
+      "name": "Send a message",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1600,
+        0
+      ],
+      "webhookId": "29c5a8d6-9d7f-4cda-ae70-380e8d430ed0",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "nJ7aYSO0b2owN51d",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Google Sheets Trigger": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Download file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download file": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "5295bde9-8d40-428e-835d-8ae70594fef0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "df4e264f20d2f148434ac18b7901238e22a88a6468d3b731714eb4a357ce2036"
+  },
+  "nodeGroups": [],
+  "id": "Fj2B48ZoAzqzF6yT",
+  "tags": []
+}
