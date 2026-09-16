@@ -5,11 +5,10 @@ An AI-powered automated resume screening workflow built using **n8n**, **Google 
 ## Tech Stack
 
 - n8n
-- JavaScript
 - Google Forms
-- Google Sheets API
-- Google Drive API
-- Gmail API
+- Google Sheets 
+- Google Drive 
+- Gmail 
 - Google Gemini (LLM)
 
 ---
